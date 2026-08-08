@@ -1,5 +1,14 @@
 # pii-redact
 
+**PII redaction & pseudonymization for LLM agents** — mask sensitive/SPI data (emails, IBAN, SIRET, addresses, IDs) before they ever reach a language model, and restore the real values after. A deterministic, local, dependency-free privacy guard for Hermes, Claude Code, OpenCode, Codex and any script.
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.9%2B-3776ab">
+  <img alt="License" src="https://img.shields.io/github/license/JulesLscx/pii-redact">
+  <img alt="Topics" src="https://img.shields.io/github/stars/JulesLscx/pii-redact?style=social">
+  <img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen">
+</p>
+
 Local, deterministic pseudonymization for personal data used by LLM agents.
 
 The model never sees your real data; you still do. Files written to disk, commands run locally, and displayed answers contain real values — only the path to the LLM provider is pseudonymized.
