@@ -14,3 +14,7 @@ dist/
 .CONTINUE_PROMPT.md
 .COMMIT_PROMPT.md
 .scratch_output.txt
+
+# Local workspace (not part of the plugin)
+.claude/
+TASK.md
