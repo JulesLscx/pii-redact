@@ -9,11 +9,15 @@ build/
 dist/
 *.egg-info/
 
-# Hermes agent scratch files — session workspace, not part of the plugin
+# Hermes agent scratch / local — session workspace, not part of the plugin
 .RESUME.md
 .CONTINUE_PROMPT.md
 .COMMIT_PROMPT.md
+.CONNECTOR_PROMPT.md
+.CONNECTOR_COMMIT_PROMPT.md
+*_PROMPT.md
 .scratch_output.txt
+.scratch_*
 
 # Local workspace (not part of the plugin)
 .claude/

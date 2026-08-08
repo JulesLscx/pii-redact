@@ -10,8 +10,12 @@ for every host at once.
 * :mod:`.stdio` — line-delimited JSON over stdin/stdout, for any host that can
   spawn a subprocess (OpenCode, Codex, editors, shell pipelines).
 * :mod:`.claude_code` — Claude Code hook events on stdin, decisions on stdout.
+* :mod:`.telemetry` — outbound direction: turns redaction *results* into
+  counters for a log shipper, a collector or an evaluation report.
+
+``docs/connectors.md`` walks through writing a fourth one.
 """
 
 from __future__ import annotations
 
-__all__ = ["claude_code", "hermes", "stdio"]
+__all__ = ["claude_code", "hermes", "stdio", "telemetry"]

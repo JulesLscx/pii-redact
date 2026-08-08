@@ -96,6 +96,34 @@ python3 -m piiredact serve
 Ops disponibles : `redact`, `restore`, `redact_args`, `restore_args`, `learn`,
 `status`.
 
+**4. Télémétrie** — pour observer la pseudonymisation sans l'intercepter :
+
+```python
+import sys
+
+from piiredact.adapters.telemetry import JsonLinesSink, TelemetryConnector
+
+probe = TelemetryConnector([JsonLinesSink(sys.stderr)], source="ingest")
+safe = probe.redact(document).text          # → LLM, plus un enregistrement
+probe.summary()  # {'calls': 42, 'spans': 517, 'counts': {...}, 'p95_ms': 11.2}
+```
+
+Les enregistrements ne portent que des compteurs, des tailles et des durées —
+aucun champ ne peut contenir de texte de document.
+
+### Adapters disponibles
+
+| Module | Hôte / protocole | Direction |
+|---|---|---|
+| `piiredact/adapters/hermes.py` | plugin Hermes in-process (hooks + middleware) | sortante + entrante |
+| `piiredact/adapters/stdio.py` | JSON ligné sur stdin/stdout (OpenCode, Codex, éditeurs, scripts) | sortante + entrante |
+| `piiredact/adapters/claude_code.py` | hooks Claude Code (`PreToolUse` / `PostToolUse`) | sortante + entrante |
+| `piiredact/adapters/telemetry.py` | observabilité : JSON lines, mémoire, `POST` HTTP par lots | sortante (mesure) |
+
+Pour en écrire un cinquième : [docs/connectors.md](docs/connectors.md) — contrat
+minimal, arbre de décision, pièges (restauration sur chemin critique, mode bloc,
+prompt caching) et checklist.
+
 ## Utilisation en ligne de commande
 
 ```bash
@@ -189,7 +217,7 @@ dégradé pendant quelques appels, jamais un appel d'outil bloqué.
 ## Développement
 
 ```bash
-python3 -m pytest                 # 114 tests
+python3 -m pytest                 # 140 tests
 python3 -m piiredact doctor       # invariants (dont l'audit des motifs)
 ```
 
@@ -205,4 +233,5 @@ Utiliser `(?!\w)`. `audit_patterns()` refuse les motifs fautifs et un test le
 vérifie.
 
 Voir [SPEC.md](SPEC.md) pour les invariants, le modèle de menace et les
-arbitrages.
+arbitrages, et [docs/connectors.md](docs/connectors.md) pour brancher un
+nouvel hôte.
