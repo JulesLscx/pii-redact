@@ -38,14 +38,13 @@ from ..payloads import contains_token, restore_args
 from ..policy import should_restore_args
 
 _DENY_REASON = (
-    "pii-redact: cet appel transmettrait des données personnelles à un service "
-    "tiers. Reformule sans les valeurs personnelles."
+    "pii-redact: this call would send personal data to a third-party service. "
+    "Rephrase it without the personal values."
 )
 
 _PROMPT_WARNING = (
-    "pii-redact: des données personnelles ont été détectées dans ce message. "
-    "Claude Code ne permet pas de les remplacer avant envoi — elles ont donc "
-    "été transmises telles quelles."
+    "pii-redact: personal data was detected in this message. Claude Code does "
+    "not allow a hook to rewrite the prompt, so it was sent as typed."
 )
 
 
@@ -123,9 +122,9 @@ def _user_prompt_submit(event: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "decision": "block",
             "reason": (
-                "pii-redact: ce message contient des données personnelles "
-                f"({', '.join(sorted(result.counts()))}). Reformule avec des "
-                "jetons ou désactive PII_REDACT_BLOCK."
+                "pii-redact: this message contains personal data "
+                f"({', '.join(sorted(result.counts()))}). Rephrase it using "
+                "tokens, or unset PII_REDACT_BLOCK."
             ),
         }
     return {"systemMessage": _PROMPT_WARNING}

@@ -8,3 +8,9 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+
+# Hermes agent scratch files — session workspace, not part of the plugin
+.RESUME.md
+.CONTINUE_PROMPT.md
+.COMMIT_PROMPT.md
+.scratch_output.txt

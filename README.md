@@ -123,6 +123,7 @@ Tout passe par l'environnement (dans `~/.hermes/.env` pour Hermes).
 | `PII_REDACT_PROFILE` | `balanced` | `balanced` ou `strict` (voir plus bas) |
 | `PII_REDACT_BLOCK` | `0` | Refuse les outils d'egress porteurs de PII au lieu de les laisser passer sur jetons |
 | `PII_REDACT_DB` | `$HERMES_HOME/pii-redact/mapping.db` | Emplacement du vault |
+| `PII_REDACT_LANG` | `fr` | Pack(s) de règles actifs, séparés par des virgules (`fr`, `en`, ou `fr,en`) — voir `piiredact/lang/` |
 | `PII_REDACT_TERMS` | — | Fichier `TYPE:valeur` chargé au démarrage |
 | `PII_REDACT_NER` | `0` | Active la passe spaCy |
 | `PII_REDACT_NER_MODEL` | `fr_core_news_sm` | Modèle spaCy |

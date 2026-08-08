@@ -18,8 +18,8 @@ from .types import EntityType
 #: Types whose value is a pure identifier — separators carry no meaning.
 _STRIP_SEPARATORS = {
     EntityType.IBAN,
-    EntityType.SIRET,
-    EntityType.NIR,
+    EntityType.TAX_ID,
+    EntityType.NATIONAL_ID,
     EntityType.CARD,
     EntityType.ACCOUNT,
     EntityType.PHONE,
@@ -57,12 +57,14 @@ def normalize_value(entity_type: str, value: str) -> str:
     """Return the canonical key for *value* under *entity_type*."""
     normalized = _WHITESPACE_RE.sub(" ", value).strip()
     if entity_type == EntityType.PHONE:
-        # +33 6 12 ... and 06 12 ... are the same subscriber.
-        digits = _SEPARATORS_RE.sub("", normalized)
-        if digits.startswith("+33"):
-            digits = "0" + digits[3:]
-        elif digits.startswith("0033"):
-            digits = "0" + digits[4:]
+        # +33 6 12 ... and 06 12 ... are the same subscriber, and so are
+        # +1 (415) 555-0132 and 415-555-0132. Strip the punctuation, then fold
+        # the international prefix into the national form for the country
+        # codes whose national numbers carry a trunk prefix.
+        digits = _SEPARATORS_RE.sub("", normalized).replace("(", "").replace(")", "")
+        for prefix, trunk in (("+33", "0"), ("0033", "0"), ("+44", "0"), ("+1", "")):
+            if digits.startswith(prefix):
+                return trunk + digits[len(prefix):]
         return digits
     if entity_type in _STRIP_SEPARATORS:
         return _SEPARATORS_RE.sub("", normalized).upper()

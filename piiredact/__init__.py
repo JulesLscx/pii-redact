@@ -21,21 +21,29 @@ import threading
 from typing import Optional
 
 from .config import Settings, load_settings
+from .lang import available as available_languages
 from .redactor import Redactor
 from .types import (
     ALL_TYPES,
-    DIRECT_IDENTIFIERS,
+    CORE_IDENTIFIERS,
+    PROFILES,
     QUASI_IDENTIFIERS,
     EntityType,
     RedactionResult,
     Span,
+    resolve_type,
+    resolve_types,
 )
 from .vault import Vault
 
 __all__ = [
     "ALL_TYPES",
-    "DIRECT_IDENTIFIERS",
+    "CORE_IDENTIFIERS",
+    "PROFILES",
     "QUASI_IDENTIFIERS",
+    "available_languages",
+    "resolve_type",
+    "resolve_types",
     "EntityType",
     "RedactionResult",
     "Redactor",

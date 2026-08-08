@@ -3,68 +3,212 @@
 Deliberately dependency-free (stdlib only) so the same objects travel across
 host integrations — Hermes plugin hooks, a Claude Code hook subprocess, an
 OpenCode/Codex adapter, or a plain ``python -m piiredact`` pipe.
+
+Entity-type names are **language-neutral**: a French NIR and a US SSN are both
+``NATIONAL_ID``, a SIRET and an EIN are both ``TAX_ID``. Country-specific
+spellings live in the language packs (:mod:`piiredact.lang`), which keeps the
+token vocabulary stable when a user enables a second language.
 """
 
 from __future__ import annotations
 
-from bisect import bisect_left, insort
+from bisect import bisect_left
 from dataclasses import dataclass, field
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Sequence, Tuple
 
 
 class EntityType:
     """Canonical entity-type names.
 
-    These strings are baked into the emitted tokens (``[EMAIL_0001]``) and
-    into the vault's ``entity_type`` column, so they are part of the on-disk
-    format: renaming one invalidates existing mappings.
+    These strings are baked into the emitted tokens (``[EMAIL_0001]``) and into
+    the vault's ``entity_type`` column, so they are part of the on-disk format:
+    renaming one invalidates existing mappings.
     """
 
-    EMAIL = "EMAIL"
-    IBAN = "IBAN"
-    NIR = "NIR"          # French social-security number
-    SIRET = "SIRET"      # French company establishment id
-    CARD = "CARD"        # payment card number
-    PHONE = "PHONE"
-    ACCOUNT = "ACCOUNT"  # bank account number introduced by "compte n° ..."
-    ADDR = "ADDR"        # street address
-    POSTAL = "POSTAL"    # 5-digit French postal code
     PERSON = "PERSON"
     ORG = "ORG"
     LOC = "LOC"
-    PLATE = "PLATE"      # vehicle registration
-    URL = "URL"          # URL carrying credentials or a personal path
+
+    EMAIL = "EMAIL"
+    PHONE = "PHONE"
+    URL = "URL"           # only URLs carrying credentials
+    IP = "IP"
+
+    ADDR = "ADDR"         # street address
+    POSTAL = "POSTAL"     # postal / ZIP code
+
+    IBAN = "IBAN"
+    CARD = "CARD"         # payment card number
+    ACCOUNT = "ACCOUNT"   # bank / contract / customer account number
+
+    NATIONAL_ID = "NATIONAL_ID"  # FR NIR, US SSN, UK NINO...
+    TAX_ID = "TAX_ID"            # FR SIRET/SIREN/VAT, US EIN...
+    PLATE = "PLATE"              # vehicle registration
+
     AMOUNT = "AMOUNT"
     DATE = "DATE"
 
 
-#: Types that directly identify a person or an account. Always redacted.
-DIRECT_IDENTIFIERS: Tuple[str, ...] = (
+#: Identifiers that point at exactly one person or account. Redacted in every
+#: profile — masking these is the entire point of the plugin.
+CORE_IDENTIFIERS: Tuple[str, ...] = (
     EntityType.EMAIL,
-    EntityType.IBAN,
-    EntityType.NIR,
-    EntityType.SIRET,
-    EntityType.CARD,
     EntityType.PHONE,
+    EntityType.IBAN,
+    EntityType.CARD,
     EntityType.ACCOUNT,
-    EntityType.ADDR,
-    EntityType.POSTAL,
-    EntityType.PERSON,
-    EntityType.ORG,
-    EntityType.LOC,
-    EntityType.PLATE,
+    EntityType.NATIONAL_ID,
+    EntityType.TAX_ID,
     EntityType.URL,
 )
 
-#: Quasi-identifiers: meaningless on their own once the direct identifiers are
-#: gone, but expensive to lose because the model needs them to do arithmetic
-#: and temporal reasoning. Redacted only in the ``strict`` profile.
+#: Identifying in context: a name, an address, a plate. Redacted by default,
+#: but a user working on public/company data may reasonably drop some.
+CONTEXT_IDENTIFIERS: Tuple[str, ...] = (
+    EntityType.PERSON,
+    EntityType.ORG,
+    EntityType.LOC,
+    EntityType.ADDR,
+    EntityType.POSTAL,
+    EntityType.PLATE,
+)
+
+#: Quasi-identifiers: meaningless on their own once the identifiers are gone,
+#: but expensive to lose because the model needs them to do arithmetic and
+#: temporal reasoning. Redacted only in the ``strict`` profile.
 QUASI_IDENTIFIERS: Tuple[str, ...] = (
     EntityType.AMOUNT,
     EntityType.DATE,
+    EntityType.IP,
 )
 
-ALL_TYPES: Tuple[str, ...] = DIRECT_IDENTIFIERS + QUASI_IDENTIFIERS
+ALL_TYPES: Tuple[str, ...] = CORE_IDENTIFIERS + CONTEXT_IDENTIFIERS + QUASI_IDENTIFIERS
+
+#: Named type sets, from least to most aggressive. ``balanced`` is the default:
+#: see ``SPEC.md`` for why amounts and dates are not in it.
+PROFILES: Dict[str, Tuple[str, ...]] = {
+    "minimal": CORE_IDENTIFIERS,
+    "balanced": CORE_IDENTIFIERS + CONTEXT_IDENTIFIERS,
+    "strict": ALL_TYPES,
+}
+
+DEFAULT_PROFILE = "balanced"
+
+#: User-facing spellings accepted in configuration. Nobody should have to
+#: remember that a phone number is ``PHONE`` and not ``TEL`` — or that their
+#: country's id scheme maps to ``NATIONAL_ID``. Matching is case-insensitive
+#: and ignores ``-``/``_``/spaces.
+TYPE_ALIASES: Dict[str, str] = {
+    # person
+    "name": EntityType.PERSON,
+    "names": EntityType.PERSON,
+    "nom": EntityType.PERSON,
+    "fullname": EntityType.PERSON,
+    "personname": EntityType.PERSON,
+    "people": EntityType.PERSON,
+    # organisation
+    "company": EntityType.ORG,
+    "companies": EntityType.ORG,
+    "organisation": EntityType.ORG,
+    "organization": EntityType.ORG,
+    "entreprise": EntityType.ORG,
+    "societe": EntityType.ORG,
+    # location
+    "location": EntityType.LOC,
+    "city": EntityType.LOC,
+    "place": EntityType.LOC,
+    "ville": EntityType.LOC,
+    "lieu": EntityType.LOC,
+    # contact
+    "mail": EntityType.EMAIL,
+    "emailaddress": EntityType.EMAIL,
+    "courriel": EntityType.EMAIL,
+    "tel": EntityType.PHONE,
+    "telephone": EntityType.PHONE,
+    "phonenumber": EntityType.PHONE,
+    "mobile": EntityType.PHONE,
+    "portable": EntityType.PHONE,
+    # address
+    "address": EntityType.ADDR,
+    "adresse": EntityType.ADDR,
+    "street": EntityType.ADDR,
+    "streetaddress": EntityType.ADDR,
+    "zip": EntityType.POSTAL,
+    "zipcode": EntityType.POSTAL,
+    "postcode": EntityType.POSTAL,
+    "postalcode": EntityType.POSTAL,
+    "codepostal": EntityType.POSTAL,
+    # banking
+    "creditcard": EntityType.CARD,
+    "card": EntityType.CARD,
+    "carte": EntityType.CARD,
+    "cb": EntityType.CARD,
+    "bankaccount": EntityType.ACCOUNT,
+    "compte": EntityType.ACCOUNT,
+    "customerid": EntityType.ACCOUNT,
+    # national / tax ids
+    "ssn": EntityType.NATIONAL_ID,
+    "socialsecurity": EntityType.NATIONAL_ID,
+    "socialsecuritynumber": EntityType.NATIONAL_ID,
+    "nir": EntityType.NATIONAL_ID,
+    "secu": EntityType.NATIONAL_ID,
+    "nino": EntityType.NATIONAL_ID,
+    "nationalid": EntityType.NATIONAL_ID,
+    "siret": EntityType.TAX_ID,
+    "siren": EntityType.TAX_ID,
+    "vat": EntityType.TAX_ID,
+    "tva": EntityType.TAX_ID,
+    "ein": EntityType.TAX_ID,
+    "taxid": EntityType.TAX_ID,
+    # misc
+    "licenseplate": EntityType.PLATE,
+    "immatriculation": EntityType.PLATE,
+    "plaque": EntityType.PLATE,
+    "money": EntityType.AMOUNT,
+    "montant": EntityType.AMOUNT,
+    "currency": EntityType.AMOUNT,
+    "prices": EntityType.AMOUNT,
+    "price": EntityType.AMOUNT,
+    "dates": EntityType.DATE,
+    "ipaddress": EntityType.IP,
+    "ipv4": EntityType.IP,
+    "url": EntityType.URL,
+    "urls": EntityType.URL,
+}
+
+
+def _normalise_key(raw: str) -> str:
+    return "".join(ch for ch in raw.lower() if ch.isalnum())
+
+
+def resolve_type(raw: str) -> str:
+    """Map a user-supplied type name to a canonical one.
+
+    Raises ``ValueError`` with the accepted names listed, because a silently
+    ignored typo in ``skip_types`` is a leak the user believes they configured
+    away.
+    """
+    key = _normalise_key(raw)
+    for canonical in ALL_TYPES:
+        if _normalise_key(canonical) == key:
+            return canonical
+    alias = TYPE_ALIASES.get(key)
+    if alias is not None:
+        return alias
+    raise ValueError(
+        f"unknown entity type {raw!r}. Known types: {', '.join(ALL_TYPES)}. "
+        f"Aliases such as name/address/mail/tel/zip are also accepted."
+    )
+
+
+def resolve_types(raw_values: Iterable[str]) -> Tuple[str, ...]:
+    """Resolve a list of user-supplied type names, preserving order."""
+    out: List[str] = []
+    for raw in raw_values:
+        canonical = resolve_type(raw)
+        if canonical not in out:
+            out.append(canonical)
+    return tuple(out)
 
 
 @dataclass(frozen=True)

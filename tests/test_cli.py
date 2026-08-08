@@ -73,7 +73,7 @@ def test_vault_list_masks_values_by_default(tmp_path: Path) -> None:
 def test_vault_add_rejects_an_unknown_type(tmp_path: Path) -> None:
     result = _run(["vault", "add", "NOPE", "x"], tmp_path)
     assert result.returncode == 2
-    assert "unknown type" in result.stderr
+    assert "unknown entity type" in result.stderr
 
 
 def test_json_output_shape(tmp_path: Path) -> None:

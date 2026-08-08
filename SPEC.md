@@ -45,11 +45,16 @@ jamais vu la vraie valeur.
 1. **Pré-réservation des jetons** — les zones contenant déjà `[TYPE_NNNN]` sont
    gelées. C'est ce qui rend l'opération idempotente et donc sûre à appliquer à
    plusieurs étages de la même requête.
-2. **Règles déterministes** (`rules.py`) — 17 règles FR, plus spécifique
-   d'abord : URL à identifiants, email, IBAN, carte, NIR, SIRET/TVA, n° de
-   compte contextuel, téléphone, immatriculation, adresse postale, noms ancrés
-   par civilité (`Mme X`) ou par champ (`Titulaire : X`), organisations ancrées
-   par forme juridique, montants, dates, code postal.
+2. **Règles déterministes** (`rules.py` + `lang/`) — le moteur (`rules.py`)
+   est neutre ; les règles elles-mêmes vivent dans un pack par langue
+   (`lang/fr.py`, `lang/en.py`) plus un pack commun aux formes universelles
+   (`lang/common.py` : email, IBAN, carte, IP). Le pack FR couvre NIR,
+   SIRET/TVA, n° de compte contextuel, téléphone, immatriculation, adresse
+   postale, noms ancrés par civilité (`Mme X`) ou par champ (`Titulaire : X`),
+   organisations ancrées par forme juridique, montants, dates, code postal.
+   `PII_REDACT_LANG` sélectionne le ou les packs actifs (défaut : `fr`) ; les
+   règles composées sont triées par priorité pour que "spécifique avant
+   générique" tienne aussi entre langues.
 3. **Répertoire littéral** (`matcher.py`) — toute valeur déjà connue du vault,
    plus les termes fournis par l'utilisateur. Une valeur détectée une fois est
    re-détectée partout ensuite, sans ancre.

@@ -5,7 +5,8 @@ Layer order is deliberate, cheapest and most certain first:
 1. **token pre-claim** — regions already holding a token are frozen, which is
    what makes the whole operation idempotent and safe to apply at several
    layers of the same request;
-2. **deterministic rules** (:mod:`.rules`) — structured French PII;
+2. **deterministic rules** (:mod:`.rules` + :mod:`.lang`) — structured PII
+   for the selected languages;
 3. **literal gazetteer** (:mod:`.matcher`) — every value ever tokenised, plus
    the user's own terms file;
 4. **statistical NER** (:mod:`.ner`) — opt-in, deadline-guarded, and its finds
@@ -28,10 +29,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .cache import LruCache
 from .config import Settings, load_settings
+from .lang import build_rules
 from .matcher import LiteralMatcher, parse_terms_file
 from .ner import NerBackend
 from .normalize import content_hash
-from .rules import BARE_TOKEN_RE, TOKEN_RE, rule_spans, token_spans
+from .rules import BARE_TOKEN_RE, TOKEN_RE, Rule, rule_spans, token_spans
 from .types import ClaimSet, RedactionResult, Span, resolve_overlaps
 from .vault import Vault
 
@@ -40,11 +42,26 @@ logger = logging.getLogger(__name__)
 #: Appended when the fail-closed guard cuts oversized content. Phrased for the
 #: model: it explains the gap so the agent asks for a narrower read instead of
 #: silently reasoning on a truncated document.
-TRUNCATION_NOTICE = (
-    "\n\n[pii-redact] Contenu tronqué localement avant transmission "
-    "(taille supérieure à la limite de scan). Relancez la lecture sur une "
-    "portion plus petite pour obtenir la suite."
-)
+TRUNCATION_NOTICES = {
+    "en": (
+        "\n\n[pii-redact] Content truncated locally before transmission "
+        "(larger than the scan limit). Re-read a smaller range to get the rest."
+    ),
+    "fr": (
+        "\n\n[pii-redact] Contenu tronqué localement avant transmission "
+        "(taille supérieure à la limite de scan). Relancez la lecture sur une "
+        "portion plus petite pour obtenir la suite."
+    ),
+}
+
+
+def truncation_notice(languages: Sequence[str]) -> str:
+    """Return the notice in the first configured language that has one."""
+    for code in languages:
+        notice = TRUNCATION_NOTICES.get(code)
+        if notice:
+            return notice
+    return TRUNCATION_NOTICES["en"]
 
 
 class Redactor:
@@ -61,8 +78,12 @@ class Redactor:
     ) -> None:
         self.settings = settings or load_settings()
         self.vault = vault or Vault(self.settings.db_path)
+        # The active rule set is composed once, from the neutral pack plus the
+        # selected language packs, and re-sorted by priority so "specific
+        # before generic" holds across languages and not only within one.
+        self.rules: Tuple[Rule, ...] = build_rules(self.settings.languages)
         self.matcher = LiteralMatcher()
-        self.ner = NerBackend(self.settings.ner_model)
+        self.ner = NerBackend(self.settings.effective_ner_model)
         self._redact_cache: LruCache[Tuple[str, Tuple[Span, ...], bool]] = LruCache(
             self.settings.cache_entries
         )
@@ -96,7 +117,7 @@ class Redactor:
         spans = self._detect(working, deadline)
         redacted, tokens = self._apply(working, spans)
         if truncated:
-            redacted += TRUNCATION_NOTICE
+            redacted += truncation_notice(self.settings.languages)
 
         # Store under the generation as it stands *after* this pass: detecting
         # a new value bumps the counter, so keying on the pre-pass generation
@@ -233,7 +254,7 @@ class Redactor:
         collected: List[Span] = []
 
         # 2. Deterministic rules — always run, never skipped by the budget.
-        collected.extend(rule_spans(text, wanted, claimed))
+        collected.extend(rule_spans(text, wanted, claimed, self.rules))
 
         # 3. Literal gazetteer (vault + terms file).
         if time.perf_counter() < deadline:

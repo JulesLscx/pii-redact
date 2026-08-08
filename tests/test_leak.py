@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from fixtures import ALL_FIXTURES, PUNCTUATED_CASES, Fixture
+from piiredact.lang import BUILTIN_LANGUAGES, build_rules
 from piiredact.rules import TOKEN_RE, audit_patterns
 
 
@@ -58,7 +59,7 @@ def test_values_with_trailing_punctuation_are_redacted(strict_redactor, text, se
 
 def test_no_rule_pattern_ends_with_word_boundary() -> None:
     """Encode the lesson in the rule set itself, not only in the cases above."""
-    assert audit_patterns() == []
+    assert audit_patterns(build_rules(BUILTIN_LANGUAGES)) == []
 
 
 def test_multiline_document_with_mixed_punctuation(strict_redactor) -> None:

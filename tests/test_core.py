@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from fixtures import FACTURE
-from piiredact import Redactor
+from piiredact import Redactor, load_settings
 from piiredact.rules import TOKEN_RE
 from piiredact.types import ClaimSet, EntityType, Span, resolve_overlaps
 from piiredact.vault import Vault
@@ -105,6 +105,12 @@ def test_type_selection_is_honoured(settings) -> None:
     assert "jean@example.fr" not in result.text
     assert "06 12 34 56 78" in result.text
     red.vault.close()
+
+
+def test_default_language_is_french() -> None:
+    """The plugin ships FR-first; an empty config must not silently fall back
+    to English rules, which would leave French formats undetected."""
+    assert load_settings(config={}).languages == ("fr",)
 
 
 def test_disabled_plugin_is_a_pure_no_op(settings) -> None:
@@ -210,8 +216,8 @@ def test_cache_is_invalidated_when_a_value_is_learned(redactor) -> None:
 # -- fail-closed guards ------------------------------------------------------
 
 
-def test_oversized_content_is_cut_not_passed_through(settings) -> None:
-    small = dataclasses.replace(settings, max_bytes=200)
+def test_oversized_content_is_cut_not_passed_through(fr_settings) -> None:
+    small = dataclasses.replace(fr_settings, max_bytes=200)
     red = Redactor(small)
     text = "x" * 500 + " IBAN FR76 3000 4000 0512 3456 7890 143"
     result = red.redact(text)

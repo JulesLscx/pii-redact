@@ -34,7 +34,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from .. import get_redactor, reset_redactor
-from ..config import Settings, load_settings
+from ..config import Settings, default_data_dir, load_settings
 from ..payloads import contains_token, redact_request, restore_args
 from ..policy import should_restore_args
 from ..redactor import Redactor
@@ -42,7 +42,7 @@ from ..redactor import Redactor
 logger = logging.getLogger(__name__)
 
 #: Sentinel returned to the model when block mode refuses an operation.
-_BLOCK_PREFIX = "pii-redact a bloqué cette opération"
+_BLOCK_PREFIX = "pii-redact blocked this operation"
 
 
 # ---------------------------------------------------------------------------
@@ -53,14 +53,15 @@ _BLOCK_PREFIX = "pii-redact a bloqué cette opération"
 def _resolve_settings() -> Settings:
     """Build settings, letting Hermes decide where state lives.
 
-    ``PII_REDACT_DB`` wins when set. Otherwise the vault follows the *active*
-    Hermes home — which is a context-local value under profiles and kanban
-    workers, so it is resolved through the host rather than read from the
-    environment.
+    An explicit location — ``PII_REDACT_DB`` or ``[vault] path`` in
+    ``config.toml`` — always wins. Otherwise the vault follows the *active*
+    Hermes home, which is a context-local value under profiles and kanban
+    workers and therefore has to be resolved through the host rather than read
+    from the environment.
     """
     settings = load_settings()
-    if os.environ.get("PII_REDACT_DB", "").strip():
-        return settings
+    if settings.db_path != default_data_dir() / "mapping.db":
+        return settings  # explicitly configured by the user
     try:
         from hermes_constants import get_hermes_home  # type: ignore
 
@@ -124,7 +125,7 @@ def on_transform_tool_result(
         logger.warning("pii-redact: tool-result pass failed for %s: %s", tool_name, exc)
         if settings.block:
             return json.dumps(
-                {"error": f"{_BLOCK_PREFIX} : échec de la pseudonymisation du résultat."},
+                {"error": f"{_BLOCK_PREFIX}: redaction of the tool result failed."},
                 ensure_ascii=False,
             )
         return None
@@ -244,11 +245,10 @@ def on_pre_tool_call(
     return {
         "action": "block",
         "message": (
-            f"{_BLOCK_PREFIX} : l'appel `{tool_name}` transmettrait des données "
-            "personnelles à un service tiers. Reformule la requête sans les "
-            "valeurs personnelles (les jetons [TYPE_NNNN] ne sont pas "
-            "résolus vers un outil externe). Pour lever le blocage : "
-            "PII_REDACT_BLOCK=0."
+            f"{_BLOCK_PREFIX}: calling `{tool_name}` would send personal data to "
+            "a third-party service. Rephrase the request without the personal "
+            "values ([TYPE_NNNN] tokens are never resolved for an external "
+            "tool). To lift the block: PII_REDACT_BLOCK=0."
         ),
     }
 
@@ -290,7 +290,8 @@ def register(ctx: Any) -> None:
 
     settings = _resolve_settings()
     logger.info(
-        "pii-redact active — profile=%s types=%d ner=%s block=%s db=%s",
+        "pii-redact active — lang=%s profile=%s types=%d ner=%s block=%s db=%s",
+        ",".join(settings.languages),
         settings.profile,
         len(settings.types),
         settings.use_ner,

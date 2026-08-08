@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from piiredact import Redactor, Settings, load_settings, reset_redactor  # noqa: E402
-from piiredact.types import DIRECT_IDENTIFIERS, QUASI_IDENTIFIERS  # noqa: E402
+from piiredact.types import PROFILES  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -34,25 +34,38 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    """Balanced-profile settings pointing at a throwaway vault."""
+    """Balanced-profile English settings pointing at a throwaway vault."""
     return dataclasses.replace(
-        load_settings(),
+        load_settings(config={}),
         db_path=tmp_path / "mapping.db",
-        types=frozenset(DIRECT_IDENTIFIERS),
+        languages=("en",),
+        types=frozenset(PROFILES["balanced"]),
     )
 
 
 @pytest.fixture
-def strict_settings(settings: Settings) -> Settings:
+def fr_settings(settings: Settings) -> Settings:
+    """French pack — most of the leak corpus is in French."""
+    return dataclasses.replace(settings, languages=("fr",))
+
+
+@pytest.fixture
+def strict_settings(fr_settings: Settings) -> Settings:
     return dataclasses.replace(
-        settings,
-        profile="strict",
-        types=frozenset(DIRECT_IDENTIFIERS) | frozenset(QUASI_IDENTIFIERS),
+        fr_settings, profile="strict", types=frozenset(PROFILES["strict"])
     )
 
 
 @pytest.fixture
-def redactor(settings: Settings) -> Iterator[Redactor]:
+def redactor(fr_settings: Settings) -> Iterator[Redactor]:
+    """Default test redactor: French pack, balanced profile."""
+    instance = Redactor(fr_settings)
+    yield instance
+    instance.vault.close()
+
+
+@pytest.fixture
+def en_redactor(settings: Settings) -> Iterator[Redactor]:
     instance = Redactor(settings)
     yield instance
     instance.vault.close()
