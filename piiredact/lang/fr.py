@@ -1,11 +1,11 @@
-"""French pack — conventions françaises.
+"""French pack.
 
-Couvre : NIR (sécurité sociale), SIRET/SIREN et TVA intracommunautaire, numéro
-de compte contextuel, téléphone métropolitain, adresse postale, code postal,
-immatriculation, personnes ancrées par civilité ou par champ, organisations
-ancrées par forme juridique, montants en euros et dates.
+Covers: NIR (social security), SIRET/SIREN and intra-EU VAT, context-anchored
+account numbers, metropolitan phone numbers, postal addresses, postal codes,
+license plates, title/field-anchored people names, legal-form-anchored
+organizations, euro amounts, and dates.
 
-Ce qui a la même forme partout (email, IBAN, carte) vit dans
+Patterns with universal shape (email, IBAN, card) live in
 :mod:`piiredact.lang.common`.
 """
 
@@ -19,7 +19,7 @@ from ..types import EntityType
 
 LANG = "fr"
 
-#: Modèle spaCy utilisé quand la couche NER est active sans modèle configuré.
+#: spaCy model used when NER is enabled without an explicit model.
 NER_MODEL = "fr_core_news_sm"
 
 _MONTHS = (
@@ -29,10 +29,10 @@ _MONTHS = (
 
 _TITLES = r"(?:M\.|MM\.|Mme|Mmes|Mlle|Dr|Pr|Me|Monsieur|Madame|Mademoiselle|Maître|Maitre)"
 
-# La majuscule initiale est imposée via un ``(?-i:...)`` local : les règles qui
-# embarquent cette chaîne sont compilées avec ``re.IGNORECASE`` pour leur ancre
-# ("banque", "titulaire"). Sans le drapeau local, la majuscule cesse d'être une
-# contrainte et la chaîne déborde sur des mots ordinaires en minuscules.
+# The initial uppercase is enforced with a local ``(?-i:...)``: rules embedding
+# this fragment are compiled with ``re.IGNORECASE`` for their anchor
+# ("banque", "titulaire"). Without the local flag, uppercase would stop being a
+# constraint and the pattern would spill into ordinary lowercase words.
 _NAME_WORD = r"(?-i:[A-ZÀ-Ý])[\w'’\-]{1,30}"
 # ``[ \t]+`` rather than ``\s+``: a real name never spans a line break, but a
 # field label on the following line ("Titulaire : Amélie Roux\nAdresse : …")
@@ -40,11 +40,11 @@ _NAME_WORD = r"(?-i:[A-ZÀ-Ý])[\w'’\-]{1,30}"
 _NAME_CHAIN = rf"{_NAME_WORD}(?:[ \t]+(?:de|du|des|le|la|van|von|d'|l')?[ \t]*{_NAME_WORD}){{0,3}}"
 
 RULES: Tuple[Rule, ...] = (
-    # -- identifiants nationaux et fiscaux -----------------------------------
+    # -- national and tax identifiers ----------------------------------------
     Rule(
         EntityType.NATIONAL_ID,
-        # NIR : sexe, année, mois, département (2A/2B pour la Corse), commune,
-        # ordre, puis clé de contrôle optionnelle.
+        # NIR: sex, year, month, department (2A/2B for Corsica), commune,
+        # order, then optional control key.
         compile_pattern(
             r"(?<!\d)[12]\s?\d{2}\s?(?:0[1-9]|1[0-2])\s?(?:\d{2}|2[AB])\s?"
             r"\d{3}\s?\d{3}(?:\s?\d{2})?(?!\d)"
@@ -54,25 +54,25 @@ RULES: Tuple[Rule, ...] = (
     ),
     Rule(
         EntityType.TAX_ID,
-        # SIRET (14 chiffres, groupés ou non). Les gardes sur les chiffres
-        # empêchent de mordre un fragment de carte à 16 chiffres.
+        # SIRET (14 digits, grouped or not). Numeric guards prevent matching a
+        # fragment of a 16-digit card number.
         compile_pattern(r"(?<!\d)\d{3}[ ]\d{3}[ ]\d{3}[ ]\d{5}(?!\d)|(?<!\d)\d{14}(?!\d)"),
         priority=Priority.STRUCTURED,
         lang=LANG,
     ),
     Rule(
         EntityType.TAX_ID,
-        # TVA intracommunautaire française.
+        # French intra-EU VAT number.
         compile_pattern(r"(?<!\w)FR[ ]?[0-9A-Z]{2}[ ]?\d{3}[ ]?\d{3}[ ]?\d{3}(?!\w)"),
         priority=Priority.STRUCTURED,
         lang=LANG,
     ),
     Rule(
         EntityType.NATIONAL_ID,
-        # Permis de conduire. Le format a changé plusieurs fois (12 chiffres
-        # avant 2013, puis 2 chiffres + 2 lettres + 5 chiffres), donc la règle
-        # s'ancre sur le libellé : une règle de forme pure ramasserait la
-        # moitié des références internes d'un document administratif.
+        # Driver's license number. The format changed multiple times (12 digits
+        # before 2013, then 2 digits + 2 letters + 5 digits), so the rule is
+        # anchored on the label; a pure-shape rule would capture many internal
+        # administrative references.
         compile_pattern(
             r"(?<!\w)permis(?:\s+de\s+conduire)?\s*(?:n[°ºo]|num[ée]ro)?\s*:?\s*"
             r"((?-i:(?=[A-Z0-9]*\d)[A-Z0-9]{8,15}))(?!\w)",
@@ -88,16 +88,16 @@ RULES: Tuple[Rule, ...] = (
             r"(?:compte|contrat|dossier|client|adh[ée]rent|assur[ée]|police|"
             r"facture|r[ée]f[ée]rence|r[ée]f)\s*"
             r"(?:bancaire\s*)?"
-            # Un qualificatif peut s'intercaler ("dossier sinistre n° …").
-            # Inoffensif depuis que le groupe capturant exige majuscules et
-            # chiffre : un mot ordinaire ne peut plus y passer.
+            # A qualifier can appear in between ("dossier sinistre n° …").
+            # Harmless since the capture group now requires uppercase and at
+            # least one digit, so ordinary words cannot pass.
             r"(?:(?-i:[a-zà-ÿ]{2,15})\s+)?"
             r"(?:n[°ºo]|num[ée]ro)?\s*:?\s*"
-            # Même précaution que ``_NAME_WORD`` : la règle est compilée avec
-            # ``re.IGNORECASE`` pour son ancre, ce qui ferait tomber la
-            # contrainte de casse et laisserait le groupe avaler le mot suivant
-            # ("dossier sinistre n° …" → "sinistre"). Le digit obligatoire
-            # écarte en plus les libellés tout en majuscules.
+            # Same precaution as ``_NAME_WORD``: this rule is compiled with
+            # ``re.IGNORECASE`` for its anchor, which would otherwise drop the
+            # case constraint and let the group swallow the next word
+            # ("dossier sinistre n° …" -> "sinistre"). The mandatory digit also
+            # excludes all-uppercase labels.
             r"((?-i:(?=[A-Z0-9\-]*\d)[A-Z0-9][A-Z0-9\-]{5,19}))(?!\w)",
             re.I,
         ),
@@ -118,23 +118,22 @@ RULES: Tuple[Rule, ...] = (
         priority=Priority.CONTACT,
         lang=LANG,
     ),
-    # -- adresse postale -----------------------------------------------------
+    # -- postal address -------------------------------------------------------
     Rule(
         EntityType.ADDR,
         compile_pattern(
             r"(?<!\w)\d{1,4}(?:\s?(?:bis|ter|quater))?[,]?\s+"
             r"(?:rue|avenue|av\.|boulevard|bd|impasse|chemin|all[ée]e|place|"
             r"route|quai|square|lieu-dit|r[ée]sidence|voie|cours|passage)\s+"
-            # Les guillemets sont exclus pour qu'une rédaction dans un résultat
-            # d'outil encodé en JSON ne puisse jamais avaler un guillemet
-            # fermant et corrompre l'enveloppe.
+            # Quotes are excluded so redaction inside a JSON-encoded tool output
+            # can never swallow a closing quote and corrupt the envelope.
             r"[^\n,;\"']{2,60}?(?=\s*(?:,|;|\n|$))",
             re.I,
         ),
         priority=Priority.ADDRESS,
         lang=LANG,
     ),
-    # -- personnes -----------------------------------------------------------
+    # -- persons --------------------------------------------------------------
     Rule(
         EntityType.PERSON,
         compile_pattern(rf"(?<!\w){_TITLES}\s+({_NAME_CHAIN})(?!\w)"),
@@ -155,11 +154,10 @@ RULES: Tuple[Rule, ...] = (
         priority=Priority.NAME,
         lang=LANG,
     ),
-    # -- organisations -------------------------------------------------------
+    # -- organizations --------------------------------------------------------
     Rule(
         EntityType.ORG,
-        # En français la forme juridique précède le nom, contrairement à
-        # l'anglais.
+        # In French, the legal form precedes the name, unlike English.
         compile_pattern(
             r"(?<!\w)(?:SARL|SASU|SAS|SA|EURL|EIRL|SCI|SNC|SCCV|GIE|SCOP|SCP|"
             r"banque|caisse|mutuelle|association|cabinet)\b"
@@ -170,12 +168,12 @@ RULES: Tuple[Rule, ...] = (
         priority=Priority.NAME,
         lang=LANG,
     ),
-    # -- quasi-identifiants (profil strict uniquement) -----------------------
+    # -- quasi-identifiers (strict profile only) ------------------------------
     Rule(
         EntityType.AMOUNT,
         compile_pattern(
-            # Le français utilise l'espace insécable (U+00A0) et l'espace
-            # insécable fine (U+202F) comme séparateur de milliers.
+            # French uses non-breaking spaces (U+00A0) and narrow non-breaking
+            # spaces (U+202F) as thousands separators.
             r"(?<![\w,.])\d{1,3}(?:[ .  ]\d{3})*(?:[,.]\d{2})?\s?(?:€|EUR|euros?)(?!\w)"
             r"|€\s?\d{1,3}(?:[ .  ]\d{3})*(?:[,.]\d{2})?(?!\w)",
             re.I,
@@ -193,13 +191,13 @@ RULES: Tuple[Rule, ...] = (
         priority=Priority.QUASI,
         lang=LANG,
     ),
-    # -- en dernier, sur ce qu'aucune autre règle n'a réclamé ----------------
+    # -- last, on text untouched by other rules -------------------------------
     Rule(
         EntityType.POSTAL,
-        # Les gardes portent sur ``[\w-]`` et non sur ``\d`` seul : sans elles,
-        # les cinq derniers chiffres d'un identifiant alphanumérique
-        # ("13AA00002", "2024-DA-88213") sont pris pour un code postal, ce qui
-        # coupe le jeton en deux et le rend illisible pour le modèle.
+        # Guards use ``[\w-]`` and not only ``\d``: without them, the last five
+        # digits of an alphanumeric identifier ("13AA00002", "2024-DA-88213")
+        # could be read as a postal code, splitting the token and making it
+        # unreadable for the model.
         compile_pattern(r"(?<![\w-])\d{5}(?![\w-])"),
         priority=Priority.GENERIC,
         lang=LANG,

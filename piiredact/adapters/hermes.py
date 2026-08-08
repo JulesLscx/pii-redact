@@ -15,8 +15,8 @@ Seam                    Job
 
 Read together they form a closed loop: real values exist on disk, in tools and
 on the user's screen; only the span between "leaving the machine" and "coming
-back" is tokenised. That is what lets the user still ask "quelle est l'adresse
-de facturation ?" and get a real answer from a model that never saw it.
+back" is tokenised. That is what lets the user still ask "what is the billing
+address?" and get a real answer from a model that never saw it.
 
 Every callback is fail-safe in the direction that matters: an unexpected error
 in the *outbound* path (redaction) is re-raised into a hard failure only in
