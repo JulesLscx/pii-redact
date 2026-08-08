@@ -1,15 +1,15 @@
 name: pii-redact
 version: "0.1.0"
 description: >-
-  Pseudonymise les données personnelles avant tout envoi au LLM et les restaure
-  localement au retour. Détection 100% déterministe par défaut (règles FR :
-  IBAN, NIR, SIRET, carte, téléphone, email, adresse, code postal, immatriculation,
-  noms ancrés par civilité/champ) complétée par un répertoire littéral persistant :
-  toute valeur déjà connue est re-détectée partout, pour toujours. NER spaCy en
-  option (PII_REDACT_NER=1). Le mapping jeton -> valeur réelle reste dans un SQLite
-  local en 0600, jamais transmis. Quatre points d'accroche : résultats d'outils et
-  payload provider en sortie, arguments d'outils locaux et réponse finale en retour —
-  l'agent garde donc toutes ses capacités sur les vraies données.
+  Pseudonymizes personal data before any LLM send and restores it locally on the
+  way back. Detection is 100% deterministic by default (French rules for IBAN,
+  NIR, SIRET, card numbers, phone, email, address, postal code, license plate,
+  and title/field-anchored names), completed by a persistent literal directory:
+  any known value is redetected everywhere, permanently. Optional spaCy NER
+  (PII_REDACT_NER=1). The token -> real-value mapping stays in local SQLite with
+  0600 permissions and is never transmitted. Four hook points are covered:
+  outbound tool results and provider payload, inbound local tool arguments, and
+  final model output, so agent capabilities remain intact on real data.
 author: "Jules Lascoux"
 kind: standalone
 # `provides_hooks` is the key Hermes' manifest parser actually reads
