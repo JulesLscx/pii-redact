@@ -4,6 +4,8 @@ Local, deterministic pseudonymization for personal data used by LLM agents.
 
 The model never sees your real data; you still do. Files written to disk, commands run locally, and displayed answers contain real values — only the path to the LLM provider is pseudonymized.
 
+> ⚠️ **Important**: this is not a miracle solution. Leaks are still possible depending on your setup and toolchain. For example, if a tool can remotely call another LLM or third-party AI service outside the guarded path, some values may still leak.
+
 ```
 You   : "what is the billing address on the latest quote?"
         │
