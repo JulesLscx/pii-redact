@@ -254,10 +254,17 @@ def on_pre_tool_call(
 
 
 def on_session_start(**_: Any) -> None:
-    """Warm the vault and the gazetteer off the latency-critical path."""
+    """Warm everything expensive off the latency-critical path.
+
+    The gazetteer compiles in-line (milliseconds); the spaCy model, when
+    enabled, loads on a background thread because a cold load costs seconds and
+    must never land inside a tool call.
+    """
     try:
         red = redactor()
         red._ensure_matcher(red.settings.types)  # noqa: SLF001 - deliberate warm-up
+        if red.settings.use_ner:
+            red.ner.prewarm()
     except Exception as exc:
         logger.debug("pii-redact: warm-up skipped: %s", exc)
 

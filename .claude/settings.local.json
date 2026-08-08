@@ -36,7 +36,12 @@
       "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_adapters.py --tb=short)",
       "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/)",
       "Bash(venv/bin/python -c ' *)",
-      "Bash(rm -rf /tmp/hv && git add -A && git commit -q -m \"docs: README + SPEC, and declare provides_hooks in the manifest *)"
+      "Bash(rm -rf /tmp/hv && git add -A && git commit -q -m \"docs: README + SPEC, and declare provides_hooks in the manifest *)",
+      "Bash(export PII_REDACT_DB=/tmp/ner/mapping.db PII_REDACT_NER=1)",
+      "Bash(/root/graph-rag/.venv/bin/python -)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/ -p no:cacheprovider)",
+      "Bash(export PII_REDACT_DB=/tmp/ner2/mapping.db PII_REDACT_NER=1)",
+      "Bash(rm -rf /tmp/final /tmp/doc.txt /tmp/back.txt /tmp/red.txt *)"
     ]
   }
 }

@@ -45,10 +45,43 @@ class NerBackend:
         self._lock = threading.Lock()
         self._nlp: Optional[Any] = None
         self._unavailable = False
+        self._loading = False
 
     @property
     def available(self) -> bool:
         return not self._unavailable
+
+    @property
+    def ready(self) -> bool:
+        """True when the model is loaded and a pass would run in-line."""
+        return self._nlp is not None
+
+    def prewarm(self) -> None:
+        """Load the model on a background thread.
+
+        Loading ``fr_core_news_sm`` takes seconds — measured at ~16 s cold on
+        this machine. Doing that inside a tool call would blow the latency
+        budget by two orders of magnitude on the first call of every session,
+        so the load never happens on the hot path: it is kicked off at session
+        start (and again, lazily, the first time a pass wants it), and until it
+        finishes the deterministic layers carry the work alone.
+        """
+        if self._nlp is not None or self._unavailable or self._loading:
+            return
+        with self._lock:
+            if self._nlp is not None or self._unavailable or self._loading:
+                return
+            self._loading = True
+        thread = threading.Thread(
+            target=self._load_in_background, name="pii-redact-ner-warm", daemon=True
+        )
+        thread.start()
+
+    def _load_in_background(self) -> None:
+        try:
+            self._load()
+        finally:
+            self._loading = False
 
     def _load(self) -> Optional[Any]:
         if self._nlp is not None or self._unavailable:
@@ -78,9 +111,15 @@ class NerBackend:
             return None
 
     def spans(self, text: str, wanted: frozenset, claimed: ClaimSet) -> List[Span]:
-        """Return NER spans that do not intersect an already-claimed region."""
-        nlp = self._load()
+        """Return NER spans that do not intersect an already-claimed region.
+
+        Never blocks on the model load: if the pipeline is not ready yet the
+        call returns nothing and schedules the load in the background. Recall
+        is degraded for the first few calls of a cold session; latency is not.
+        """
+        nlp = self._nlp
         if nlp is None:
+            self.prewarm()
             return []
         try:
             doc = nlp(text)

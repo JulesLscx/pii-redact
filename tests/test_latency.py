@@ -91,3 +91,25 @@ def test_budget_reported_in_the_result(redactor, size: int) -> None:
     result = redactor.redact(FACTURE.text * size)
     assert result.elapsed_ms >= 0.0
     assert result.elapsed_ms < BUDGET_MS * 2
+
+
+def test_cold_ner_never_blocks_a_call(settings) -> None:
+    """A cold spaCy load costs seconds; it must happen off the hot path.
+
+    The pass is expected to return nothing until the background load lands —
+    degraded recall for a few calls, never a stalled tool call.
+    """
+    import dataclasses
+
+    from piiredact import Redactor
+    from piiredact.types import ClaimSet
+
+    red = Redactor(dataclasses.replace(settings, use_ner=True))
+
+    started = time.perf_counter()
+    spans = red.ner.spans("Bertrand Fauchier à Grenoble", red.settings.types, ClaimSet())
+    elapsed = (time.perf_counter() - started) * 1000
+
+    assert spans == []
+    assert elapsed < BUDGET_MS, f"cold NER blocked for {elapsed:.0f} ms"
+    red.vault.close()

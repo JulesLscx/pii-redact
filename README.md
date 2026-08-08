@@ -169,7 +169,10 @@ en régime établi. Le budget de 300 ms couvre un document d'environ 300 Ko.
 
 La passe spaCy coûte 30 à 150 ms par document : c'est pour cela qu'elle est
 désactivée par défaut, et pourquoi les couches déterministes ont été conçues
-pour ne pas en avoir besoin.
+pour ne pas en avoir besoin. Le **chargement** du modèle coûte lui ~16 s à
+froid : il se fait donc sur un thread d'arrière-plan, déclenché au démarrage de
+session. Tant qu'il n'a pas abouti, la passe NER ne renvoie rien — rappel
+dégradé pendant quelques appels, jamais un appel d'outil bloqué.
 
 ## Sécurité
 
