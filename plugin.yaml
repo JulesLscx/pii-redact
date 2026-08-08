@@ -12,6 +12,17 @@ description: >-
   l'agent garde donc toutes ses capacités sur les vraies données.
 author: "Jules Lascoux"
 kind: standalone
+# `provides_hooks` is the key Hermes' manifest parser actually reads
+# (hermes_cli/plugins.py::_parse_manifest), and it drives `hermes plugins list`.
+# The bundled `security-guidance` example declares `hooks:` instead, which the
+# parser ignores — both are listed here so the manifest is correct today and
+# still readable to anyone comparing it with that example.
+provides_hooks:
+  - transform_tool_result
+  - transform_llm_output
+  - pre_tool_call
+  - on_session_start
+  - on_session_reset
 hooks:
   - transform_tool_result
   - transform_llm_output

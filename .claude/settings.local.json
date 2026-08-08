@@ -33,7 +33,10 @@
       "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_leak.py --tb=short)",
       "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_core.py --tb=short)",
       "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/ --tb=short)",
-      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_adapters.py --tb=short)"
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_adapters.py --tb=short)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/)",
+      "Bash(venv/bin/python -c ' *)",
+      "Bash(rm -rf /tmp/hv && git add -A && git commit -q -m \"docs: README + SPEC, and declare provides_hooks in the manifest *)"
     ]
   }
 }

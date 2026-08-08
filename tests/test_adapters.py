@@ -53,13 +53,19 @@ def test_register_wires_every_declared_seam() -> None:
 
 
 def test_plugin_yaml_matches_the_code() -> None:
-    """The manifest is what Hermes shows the user — it must not drift."""
+    """The manifest is what Hermes shows the user — it must not drift.
+
+    ``provides_hooks`` is the key the host's parser actually reads; the block
+    has to be present *and* complete, not just the ``hooks`` alias.
+    """
     from pathlib import Path
 
     manifest = Path(__file__).resolve().parent.parent / "plugin.yaml"
     raw = manifest.read_text(encoding="utf-8")
+    assert "provides_hooks:" in raw
+    declared = raw.split("provides_hooks:", 1)[1].split("hooks:", 1)[0]
     for hook in hermes.HOOKS:
-        assert f"- {hook}" in raw, f"{hook} missing from plugin.yaml"
+        assert f"- {hook}" in declared, f"{hook} missing from provides_hooks"
     for kind in hermes.MIDDLEWARE:
         assert f"- {kind}" in raw, f"{kind} missing from plugin.yaml"
 
