@@ -1,40 +1,30 @@
 # pii-redact
 
-Pseudonymisation locale et déterministe des données personnelles, pour agents LLM.
+Local, deterministic pseudonymization for personal data used by LLM agents.
 
-Le modèle ne voit jamais vos vraies données ; vous, si. Les fichiers écrits sur
-le disque, les commandes exécutées et la réponse affichée contiennent les vraies
-valeurs — seul le trajet vers le fournisseur de LLM est pseudonymisé.
+The model never sees your real data; you still do. Files written to disk, commands run locally, and displayed answers contain real values — only the path to the LLM provider is pseudonymized.
 
 ```
-Vous  : « quelle est l'adresse de facturation du dernier devis ? »
+You   : "what is the billing address on the latest quote?"
         │
-        ├─ l'agent lit devis.pdf         → "12 bis rue des Lilas, 69007 Lyon"
-        ├─ pii-redact                    → "[ADDR_0001], [POSTAL_0001] Lyon"
-        ├─ le LLM raisonne sur les jetons et répond "…est [ADDR_0001]"
-        └─ pii-redact restaure           → « …est 12 bis rue des Lilas »
-Vous  : lisez la vraie adresse. Le modèle ne l'a jamais reçue.
+        ├─ agent reads quote.pdf        → "12 bis rue des Lilas, 69007 Lyon"
+        ├─ pii-redact                   → "[ADDR_0001], [POSTAL_0001] Lyon"
+        ├─ LLM reasons on tokens        → "...is [ADDR_0001]"
+        └─ pii-redact restores          → "...is 12 bis rue des Lilas"
+You   : read the real address. The model never received it.
 ```
 
-## Ce qui est détecté
+## What is detected
 
-Email · IBAN · carte bancaire · NIR (sécurité sociale) · SIRET / TVA
-intracommunautaire · n° de compte ou de contrat · téléphone · immatriculation ·
-adresse postale · code postal · URL contenant des identifiants · noms de
-personnes ancrés par civilité (`Mme X`, `Dr X`) ou par champ (`Titulaire : X`) ·
-organisations ancrées par forme juridique (`SARL X`, `mutuelle X`) · montants ·
-dates.
+Email · IBAN · card numbers · French NIR (social security) · SIRET / intra-EU VAT · account or contract IDs · phone numbers · license plates · postal addresses · ZIP/postal codes · URLs containing identifiers · person names anchored by title (`Ms X`, `Dr X`) or field (`Account holder: X`) · organizations anchored by legal form (`SARL X`) · amounts · dates.
 
-Plus : **toute valeur déjà rencontrée une fois**. Le répertoire littéral est
-persistant, donc un nom capté une seule fois par une civilité est ensuite
-reconnu partout, nu, dans n'importe quel document, indéfiniment.
+Plus: **any value seen once already**. The literal directory is persistent, so a name captured once (for example via title) is then recognized everywhere, unanchored, across documents.
 
 ## Installation
 
 ### Hermes Agent
 
-Le plugin est déjà au bon endroit (`~/.hermes/plugins/pii-redact/`). Il reste à
-l'activer dans `~/.hermes/config.yaml` :
+The plugin is already in place (`~/.hermes/plugins/pii-redact/`). Enable it in `~/.hermes/config.yaml`:
 
 ```yaml
 plugins:
@@ -42,27 +32,27 @@ plugins:
     - pii-redact
 ```
 
-puis `hermes gateway restart` (ou relancer votre session). Vérification :
+Then run `hermes gateway restart` (or restart your session). Verify:
 
 ```bash
 hermes plugins list | grep pii-redact
-python3 -m piiredact doctor         # depuis ~/.hermes/plugins/pii-redact
+python3 -m piiredact doctor         # from ~/.hermes/plugins/pii-redact
 ```
 
-### Autres hôtes (Claude Code, OpenCode, Codex, scripts)
+### Other hosts (Claude Code, OpenCode, Codex, scripts)
 
-Le cœur est un paquet Python sans aucune dépendance. Trois façons de le brancher :
+The core is a dependency-free Python package. Three integration modes:
 
-**1. Bibliothèque**
+**1. Library**
 
 ```python
 from piiredact import redact, restore
 
 safe = redact(document).text     # → LLM
-vrai = restore(reponse_modele)   # → utilisateur / outil
+real = restore(model_answer)     # → user / local tool
 ```
 
-**2. Hooks Claude Code** — `~/.claude/settings.json` :
+**2. Claude Code hooks** — `~/.claude/settings.json`:
 
 ```json
 {
@@ -73,19 +63,11 @@ vrai = restore(reponse_modele)   # → utilisateur / outil
 }
 ```
 
-`PostToolUse` pseudonymise les résultats d'outils (`updatedToolOutput`),
-`PreToolUse` restaure les valeurs pour les outils locaux (`updatedInput`) et
-refuse les outils d'egress en mode `block`.
+`PostToolUse` pseudonymizes tool results (`updatedToolOutput`), `PreToolUse` restores values for local tools (`updatedInput`) and blocks egress tools in `block` mode.
 
-> **Limite documentée** : `UserPromptSubmit` ne permet pas de réécrire le texte
-> du prompt. La PII que vous tapez *vous-même* dans Claude Code ne peut donc pas
-> être pseudonymisée en vol — vous recevez un avertissement, ou un blocage si
-> `PII_REDACT_BLOCK=1`. Hermes n'a pas cette limite (le middleware `llm_request`
-> couvre tout le payload).
+> **Known limitation**: `UserPromptSubmit` cannot rewrite prompt text. PII typed directly by the user in Claude Code cannot be pseudonymized in transit — you get a warning, or a hard block if `PII_REDACT_BLOCK=1`. Hermes does not have this limitation (`llm_request` middleware covers the full payload).
 
-**3. Serveur JSON-lines** — pour n'importe quel hôte capable de lancer un
-sous-processus. Un processus qui reste chaud évite les ~100 ms de démarrage de
-l'interpréteur à chaque événement :
+**3. JSON-lines server** — for any host that can spawn a subprocess. Keeping one hot process avoids Python startup overhead on each event:
 
 ```bash
 python3 -m piiredact serve
@@ -93,116 +75,87 @@ python3 -m piiredact serve
 {"ok": true, "text": "IBAN [IBAN_0001]", "counts": {"IBAN": 1}, "ms": 0.4}
 ```
 
-Ops disponibles : `redact`, `restore`, `redact_args`, `restore_args`, `learn`,
-`status`.
+Available ops: `redact`, `restore`, `redact_args`, `restore_args`, `learn`, `status`.
 
-## Utilisation en ligne de commande
+## CLI usage
 
 ```bash
-python3 -m piiredact redact < facture.txt      # pseudonymise
-python3 -m piiredact restore < reponse.txt     # restaure
-python3 -m piiredact doctor                    # config effective + invariants
-python3 -m piiredact bench                     # latence mesurée
-python3 -m piiredact vault count               # combien de valeurs connues
-python3 -m piiredact vault list                # valeurs masquées (--reveal pour tout voir)
-python3 -m piiredact vault add PERSON "Amélie" # apprendre une valeur à la main
+python3 -m piiredact redact < invoice.txt      # pseudonymize
+python3 -m piiredact restore < answer.txt      # restore
+python3 -m piiredact doctor                    # effective config + invariants
+python3 -m piiredact bench                     # measured latency
+python3 -m piiredact vault count               # number of known values
+python3 -m piiredact vault list                # masked values (--reveal to show all)
+python3 -m piiredact vault add PERSON "Amelie" # learn a value manually
 python3 -m piiredact vault forget '[PERSON_0003]'
 ```
 
-`vault add` est l'échappatoire pour ce qu'aucune règle ne peut deviner : un
-prénom d'enfant, un surnom, un nom de projet. Une fois ajouté, il est masqué
-partout, pour toujours.
+`vault add` is the escape hatch for values no rule can infer: a child first name, nickname, project codename. Once added, it is masked everywhere, permanently.
 
 ## Configuration
 
-Tout passe par l'environnement (dans `~/.hermes/.env` pour Hermes).
+Everything is environment-driven (in `~/.hermes/.env` for Hermes).
 
-| Variable | Défaut | Effet |
+| Variable | Default | Effect |
 |---|---|---|
-| `PII_REDACT_DISABLE` | `0` | Désactive tout (no-op complet) |
-| `PII_REDACT_PROFILE` | `balanced` | `balanced` ou `strict` (voir plus bas) |
-| `PII_REDACT_BLOCK` | `0` | Refuse les outils d'egress porteurs de PII au lieu de les laisser passer sur jetons |
-| `PII_REDACT_DB` | `$HERMES_HOME/pii-redact/mapping.db` | Emplacement du vault |
-| `PII_REDACT_LANG` | `fr` | Pack(s) de règles actifs, séparés par des virgules (`fr`, `en`, ou `fr,en`) — voir `piiredact/lang/` |
-| `PII_REDACT_TERMS` | — | Fichier `TYPE:valeur` chargé au démarrage |
-| `PII_REDACT_NER` | `0` | Active la passe spaCy |
-| `PII_REDACT_NER_MODEL` | `fr_core_news_sm` | Modèle spaCy |
-| `PII_REDACT_TYPES` | — | Liste explicite de types (remplace le profil) |
-| `PII_REDACT_ADD_TYPES` / `PII_REDACT_SKIP_TYPES` | — | Ajustements au profil |
-| `PII_REDACT_BUDGET_MS` | `300` | Budget de latence par appel |
-| `PII_REDACT_MAX_BYTES` | `4194304` | Au-delà, le contenu est tronqué (jamais transmis en clair) |
-| `PII_REDACT_EGRESS_TOOLS` | — | Outils supplémentaires traités comme tiers |
-| `PII_REDACT_LOCAL_TOOLS` | — | Outils forcés en « local » |
-| `PII_REDACT_GUARD_PAYLOAD` | `1` | Passe finale sur le payload provider |
-| `PII_REDACT_RESTORE_TOOL_ARGS` | `1` | Restauration des arguments d'outils locaux |
-| `PII_REDACT_LOG_COUNTS` | `0` | Journalise les compteurs par type (jamais les valeurs) |
+| `PII_REDACT_DISABLE` | `0` | Disable everything (full no-op) |
+| `PII_REDACT_PROFILE` | `balanced` | `balanced` or `strict` (see below) |
+| `PII_REDACT_BLOCK` | `0` | Reject egress tool calls containing PII instead of allowing tokenized output |
+| `PII_REDACT_DB` | `$HERMES_HOME/pii-redact/mapping.db` | Vault location |
+| `PII_REDACT_LANG` | `fr` | Active rule pack(s), comma-separated (`fr`, `en`, or `fr,en`) |
+| `PII_REDACT_TERMS` | — | `TYPE:value` file loaded at startup |
+| `PII_REDACT_NER` | `0` | Enable spaCy pass |
+| `PII_REDACT_NER_MODEL` | `fr_core_news_sm` | spaCy model |
+| `PII_REDACT_TYPES` | — | Explicit type list (replaces profile) |
+| `PII_REDACT_ADD_TYPES` / `PII_REDACT_SKIP_TYPES` | — | Profile adjustments |
+| `PII_REDACT_BUDGET_MS` | `300` | Latency budget per call |
+| `PII_REDACT_MAX_BYTES` | `4194304` | Content is truncated above this size (never sent in clear text) |
+| `PII_REDACT_EGRESS_TOOLS` | — | Extra tools treated as third-party egress |
+| `PII_REDACT_LOCAL_TOOLS` | — | Tools forced to local mode |
+| `PII_REDACT_GUARD_PAYLOAD` | `1` | Final pass on provider payload |
+| `PII_REDACT_RESTORE_TOOL_ARGS` | `1` | Restore local tool arguments |
+| `PII_REDACT_LOG_COUNTS` | `0` | Log per-type counters (never values) |
 
-### Profils
+### Profiles
 
-**`balanced` (défaut)** — tous les identifiants directs sont pseudonymisés ; les
-**montants et les dates restent lisibles**. Un montant seul, une fois le nom,
-l'adresse et l'IBAN retirés, n'identifie personne — mais le masquer supprime la
-capacité du modèle à additionner, comparer et raisonner sur des échéances.
-C'est le profil qui préserve le plus de fonctionnalités.
+**`balanced` (default)** — all direct identifiers are pseudonymized; **amounts and dates stay readable**. A standalone amount, once name/address/IBAN are removed, is typically not identifying, while masking it harms arithmetic, comparisons, and due-date reasoning.
 
-**`strict`** — ajoute les montants et les dates. À choisir si votre modèle de
-menace inclut la ré-identification par recoupement. Vous perdez l'arithmétique
-et le raisonnement temporel du modèle.
+**`strict`** — also masks amounts and dates. Use when your threat model includes linkage re-identification. You lose model arithmetic and temporal reasoning.
 
 ```bash
-PII_REDACT_PROFILE=strict     # tout est masqué
-PII_REDACT_SKIP_TYPES=ORG,LOC # ou un réglage fin type par type
+PII_REDACT_PROFILE=strict     # mask everything
+PII_REDACT_SKIP_TYPES=ORG,LOC # or tune type-by-type
 ```
 
 ## Performance
 
-Mesuré sur cette machine (`python3 -m piiredact bench`), texte très dense en PII :
+Measured on this machine (`python3 -m piiredact bench`) on dense PII text:
 
-| Taille | p50 | p95 |
+| Size | p50 | p95 |
 |---|---|---|
-| 4 Ko | 5 ms | 6 ms |
-| 210 Ko | 167 ms | 203 ms |
+| 4 KB | 5 ms | 6 ms |
+| 210 KB | 167 ms | 203 ms |
 
-Le coût est **linéaire** (~0,8 ms/Ko) et le contenu déjà vu est servi par un
-cache de hash, donc la passe sur le payload provider — qui rejoue tout
-l'historique avant chaque appel API — coûte quelques dizaines de microsecondes
-en régime établi. Le budget de 300 ms couvre un document d'environ 300 Ko.
+Cost is **linear** (~0.8 ms/KB). Previously seen content is hash-cached, so the provider payload pass (which replays full history before each API call) stays in the microsecond range once warm. The 300 ms budget covers roughly 300 KB.
 
-La passe spaCy coûte 30 à 150 ms par document : c'est pour cela qu'elle est
-désactivée par défaut, et pourquoi les couches déterministes ont été conçues
-pour ne pas en avoir besoin. Le **chargement** du modèle coûte lui ~16 s à
-froid : il se fait donc sur un thread d'arrière-plan, déclenché au démarrage de
-session. Tant qu'il n'a pas abouti, la passe NER ne renvoie rien — rappel
-dégradé pendant quelques appels, jamais un appel d'outil bloqué.
+spaCy pass costs 30–150 ms per document, so it is disabled by default. Model load itself can take ~16 s cold-start, so loading runs on a background thread at session startup. Until ready, NER returns no matches; deterministic layers still run and tool calls are not blocked.
 
-## Sécurité
+## Security
 
-- Le vault SQLite est créé en `0600` dans un répertoire `0700`. Il contient les
-  valeurs réelles : c'est exactement le matériel qu'on garde hors du réseau.
-- **Aucun outil n'est exposé à l'agent pour lire le vault** — ce serait une
-  porte d'entrée triviale vers les valeurs réelles.
-- Les journaux ne contiennent jamais de valeurs, seulement des compteurs par
-  type.
-- Un jeton inconnu se restaure en lui-même : une base tournée dégrade en
-  « marqueur inerte », jamais en sortie corrompue.
+- SQLite vault is created with `0600` permissions in a `0700` directory. It contains real values and stays local.
+- **No agent-exposed tool can read the vault** — otherwise the model could trivially ask for table contents.
+- Logs never include values, only per-type counters.
+- Unknown tokens restore to themselves: a rotated database degrades to inert markers, never corrupted output.
 
-## Développement
+## Development
 
 ```bash
 python3 -m pytest                 # 114 tests
-python3 -m piiredact doctor       # invariants (dont l'audit des motifs)
+python3 -m piiredact doctor       # invariants (including pattern audit)
 ```
 
-Le test qui compte est `tests/test_leak.py` : quatre documents français
-réalistes (facture, relevé bancaire, avis d'imposition, compte rendu) et
-l'assertion qu'aucune valeur déclarée ne survit. Il a trouvé deux vrais bugs à
-sa première exécution.
+The key test is `tests/test_leak.py`: four realistic French documents (invoice, bank statement, tax notice, report) and an assertion that no declared value survives redaction.
 
-**Piège à ne jamais réintroduire** : une règle qui se termine par `\b` casse dès
-que la valeur est suivie d'une ponctuation (`1 234,56 €.`), parce qu'il n'y a
-pas de frontière de mot entre `€` et `.` — et la valeur part en clair.
-Utiliser `(?!\w)`. `audit_patterns()` refuse les motifs fautifs et un test le
-vérifie.
+**Do not reintroduce this trap**: a rule ending with `\b` breaks when a value is followed by punctuation (`1 234,56 €.`), because there is no word boundary between `€` and `.` — the value can leak. Use `(?!\w)` instead. `audit_patterns()` rejects faulty patterns and a dedicated test enforces it.
 
-Voir [SPEC.md](SPEC.md) pour les invariants, le modèle de menace et les
-arbitrages.
+See [docs/SPEC.md](docs/SPEC.md) for invariants, threat model, and design trade-offs.
