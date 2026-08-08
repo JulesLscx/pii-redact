@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//usr/local/lib/hermes-agent/**)",
+      "Read(//usr/local/lib/hermes-agent/plugins/**)",
+      "Bash(python3 -c \"print\\(\\)\")",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(python3 -)",
+      "Bash(python3 -c \"import sqlite3,sys; print\\(sys.version.split\\(\\)[0], sqlite3.sqlite_version\\)\")",
+      "Bash(/usr/local/lib/hermes-agent/venv/bin/python -c \"import sqlite3,sys; print\\(sys.version.split\\(\\)[0], sqlite3.sqlite_version\\)\")",
+      "Bash(PII_REDACT_DB=/tmp/t1/mapping.db python3 -)"
+    ]
+  }
+}
