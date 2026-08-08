@@ -11,7 +11,19 @@
       "Bash(python3 -)",
       "Bash(python3 -c \"import sqlite3,sys; print\\(sys.version.split\\(\\)[0], sqlite3.sqlite_version\\)\")",
       "Bash(/usr/local/lib/hermes-agent/venv/bin/python -c \"import sqlite3,sys; print\\(sys.version.split\\(\\)[0], sqlite3.sqlite_version\\)\")",
-      "Bash(PII_REDACT_DB=/tmp/t1/mapping.db python3 -)"
+      "Bash(PII_REDACT_DB=/tmp/t1/mapping.db python3 -)",
+      "Bash(export PII_REDACT_DB=/tmp/t2/mapping.db)",
+      "Bash(python3 -m piiredact doctor)",
+      "Bash(python3 -m piiredact redact --stats)",
+      "Bash(python3 -m piiredact serve)",
+      "Bash(python3 -m piiredact bench --runs 40)",
+      "Bash(python3 -m piiredact bench --runs 15 --repeat 1000)",
+      "Bash(python3 -m piiredact bench --runs 5 --repeat 5000)",
+      "Bash(pkill -f \"piiredact bench\")",
+      "Bash(export PII_REDACT_DB=/tmp/t4/mapping.db)",
+      "Bash(export PII_REDACT_DB=/tmp/t5/mapping.db)",
+      "Bash(timeout 180 python3 -m piiredact bench --runs 20 --repeat 1000)",
+      "Bash(rm -rf /tmp/t2 /tmp/t3 /tmp/t4 /tmp/t5 *)"
     ]
   }
 }

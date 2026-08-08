@@ -59,6 +59,7 @@ class Vault:
         self._lock = threading.RLock()
         self._token_cache: Dict[str, str] = {}   # value_hash -> token
         self._value_cache: Dict[str, str] = {}   # token -> real value
+        self._literal_cache: Dict[Tuple[str, str], str] = {}  # (type, raw) -> token
         self._generation = 0
         self._prepare_paths()
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
@@ -111,9 +112,16 @@ class Vault:
 
     def token_for(self, entity_type: str, value: str) -> str:
         """Return the stable token for *value*, creating it on first sight."""
+        # Raw-form fast path: the same literal usually recurs many times in one
+        # document, and this skips normalisation + hashing for every repeat.
+        literal_key = (entity_type, value)
+        literal_hit = self._literal_cache.get(literal_key)
+        if literal_hit is not None:
+            return literal_hit
         digest = hash_value(entity_type, value)
         cached = self._token_cache.get(digest)
         if cached is not None:
+            self._literal_cache[literal_key] = cached
             return cached
 
         with self._lock:
@@ -124,10 +132,12 @@ class Vault:
             if row is not None:
                 token = str(row["token"])
                 self._token_cache[digest] = token
+                self._literal_cache[literal_key] = token
                 return token
 
             token = self._allocate_locked(entity_type, value.strip(), digest)
             self._token_cache[digest] = token
+            self._literal_cache[literal_key] = token
             self._value_cache[token] = value.strip()
             self._generation += 1
             return token
@@ -219,6 +229,9 @@ class Vault:
             self._value_cache.pop(token, None)
             self._token_cache = {
                 h: t for h, t in self._token_cache.items() if t != token
+            }
+            self._literal_cache = {
+                k: t for k, t in self._literal_cache.items() if t != token
             }
             self._generation += 1
             return cur.rowcount > 0

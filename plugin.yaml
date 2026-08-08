@@ -1,0 +1,23 @@
+name: pii-redact
+version: "0.1.0"
+description: >-
+  Pseudonymise les données personnelles avant tout envoi au LLM et les restaure
+  localement au retour. Détection 100% déterministe par défaut (règles FR :
+  IBAN, NIR, SIRET, carte, téléphone, email, adresse, code postal, immatriculation,
+  noms ancrés par civilité/champ) complétée par un répertoire littéral persistant :
+  toute valeur déjà connue est re-détectée partout, pour toujours. NER spaCy en
+  option (PII_REDACT_NER=1). Le mapping jeton -> valeur réelle reste dans un SQLite
+  local en 0600, jamais transmis. Quatre points d'accroche : résultats d'outils et
+  payload provider en sortie, arguments d'outils locaux et réponse finale en retour —
+  l'agent garde donc toutes ses capacités sur les vraies données.
+author: "Jules Lascoux"
+kind: standalone
+hooks:
+  - transform_tool_result
+  - transform_llm_output
+  - pre_tool_call
+  - on_session_start
+  - on_session_reset
+middleware:
+  - llm_request
+  - tool_request

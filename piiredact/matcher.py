@@ -26,7 +26,7 @@ import threading
 from typing import Dict, FrozenSet, Iterable, List, Optional, Pattern, Sequence, Tuple
 
 from .normalize import strip_accents
-from .types import EntityType, Span
+from .types import ClaimSet, EntityType, Span
 
 #: Types compared without case/accents. Identifiers are matched verbatim
 #: (their normalised form is already covered by the rules).
@@ -121,7 +121,7 @@ class LiteralMatcher:
 
     # -- matching ------------------------------------------------------------
 
-    def spans(self, text: str, claimed: Sequence[Span]) -> List[Span]:
+    def spans(self, text: str, claimed: ClaimSet) -> List[Span]:
         """Return literal hits that do not intersect an already-claimed span."""
         pattern = self._pattern
         if pattern is None:
@@ -135,10 +135,11 @@ class LiteralMatcher:
             )
             if entity_type is None:
                 continue
-            span = Span(match.start(), match.end(), entity_type, matched, origin="vault")
-            if any(span.overlaps(other) for other in claimed):
+            start, end = match.span()
+            if claimed.overlaps(start, end):
                 continue
-            found.append(span)
+            found.append(Span(start, end, entity_type, matched, origin="vault"))
+            claimed.add(start, end)
         return found
 
     @property

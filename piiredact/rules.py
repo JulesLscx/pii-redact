@@ -23,7 +23,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterator, List, Pattern, Sequence, Tuple
 
-from .types import EntityType, Span
+from .types import ClaimSet, EntityType, Span
 
 #: Emitted token shape. ``{4,}`` digits so a token can never be mistaken for a
 #: 5-digit postal code at sequence 10000+ — and token spans are claimed before
@@ -206,24 +206,24 @@ RULES: Sequence[Rule] = (
 )
 
 
-def token_spans(text: str) -> List[Span]:
-    """Return spans covering tokens that are already in *text*.
+def token_spans(text: str) -> ClaimSet:
+    """Return a claim set covering tokens already present in *text*.
 
     Claiming these before any rule runs is what makes the whole pipeline
     idempotent and safe to run at several layers of the same request (a tool
     result is redacted once on its way out of the tool, then the provider
     payload containing it is scanned again before the wire).
     """
-    return [
-        Span(m.start(), m.end(), m.group(1), m.group(0), origin="token")
-        for m in TOKEN_RE.finditer(text)
-    ]
+    claimed = ClaimSet()
+    for match in TOKEN_RE.finditer(text):
+        claimed.add(match.start(), match.end())
+    return claimed
 
 
-def rule_spans(text: str, wanted: frozenset, claimed: List[Span]) -> List[Span]:
+def rule_spans(text: str, wanted: frozenset, claimed: ClaimSet) -> List[Span]:
     """Run every enabled rule, skipping regions already claimed.
 
-    ``claimed`` is mutated as spans are accepted so that later (more generic)
+    ``claimed`` is updated as spans are accepted so that later (more generic)
     rules cannot overlap earlier (more specific) hits.
     """
     found: List[Span] = []
@@ -231,11 +231,10 @@ def rule_spans(text: str, wanted: frozenset, claimed: List[Span]) -> List[Span]:
         if rule.entity_type not in wanted:
             continue
         for start, end, matched in rule.finditer(text):
-            span = Span(start, end, rule.entity_type, matched, origin="rule")
-            if any(span.overlaps(other) for other in claimed):
+            if claimed.overlaps(start, end):
                 continue
-            found.append(span)
-            claimed.append(span)
+            found.append(Span(start, end, rule.entity_type, matched, origin="rule"))
+            claimed.add(start, end)
     return found
 
 

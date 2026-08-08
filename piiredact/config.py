@@ -54,6 +54,15 @@ def _split_types(raw: str) -> Tuple[str, ...]:
     )
 
 
+def _split_names(raw: str) -> Tuple[str, ...]:
+    """Split a comma/semicolon list of tool names, preserving their case."""
+    return tuple(
+        part.strip()
+        for part in raw.replace(";", ",").split(",")
+        if part.strip()
+    )
+
+
 def default_data_dir() -> Path:
     """Resolve the state directory without hardcoding any host layout.
 
@@ -119,6 +128,25 @@ class Settings:
     restore_bare_tokens: bool = True
     """Also restore ``EMAIL_0001`` when the model drops the brackets."""
 
+    guard_tool_results: bool = True
+    """Redact tool results (file reads, document extraction, shell output)."""
+
+    guard_payload: bool = True
+    """Last-mile pass over the provider request. Belt and braces: it catches
+    anything that reached the context by a path with no hook of its own —
+    a pasted IBAN, a recalled memory, an injected profile."""
+
+    restore_tool_args: bool = True
+    """Put real values back into local tool arguments. This is what keeps the
+    agent fully functional; :mod:`piiredact.policy` decides which tools are
+    local enough to qualify."""
+
+    egress_extra: FrozenSet[str] = frozenset()
+    """Extra tool names to treat as third-party egress (never restored)."""
+
+    local_extra: FrozenSet[str] = frozenset()
+    """Tool names to force back to "local" despite matching an egress marker."""
+
     log_counts: bool = False
     """Log per-type hit counts (never values) at INFO."""
 
@@ -182,5 +210,10 @@ def load_settings() -> Settings:
         max_bytes=_env_int("MAX_BYTES", 4 * 1024 * 1024),
         cache_entries=_env_int("CACHE_ENTRIES", 4096),
         restore_bare_tokens=_env_bool("RESTORE_BARE_TOKENS", True),
+        guard_tool_results=_env_bool("GUARD_TOOL_RESULTS", True),
+        guard_payload=_env_bool("GUARD_PAYLOAD", True),
+        restore_tool_args=_env_bool("RESTORE_TOOL_ARGS", True),
+        egress_extra=frozenset(_split_names(_env("EGRESS_TOOLS"))),
+        local_extra=frozenset(_split_names(_env("LOCAL_TOOLS"))),
         log_counts=_env_bool("LOG_COUNTS", False),
     )

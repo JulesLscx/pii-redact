@@ -21,7 +21,7 @@ import logging
 import threading
 from typing import Any, List, Optional, Sequence
 
-from .types import EntityType, Span
+from .types import ClaimSet, EntityType, Span
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class NerBackend:
             self._unavailable = True
             return None
 
-    def spans(self, text: str, wanted: frozenset, claimed: Sequence[Span]) -> List[Span]:
+    def spans(self, text: str, wanted: frozenset, claimed: ClaimSet) -> List[Span]:
         """Return NER spans that do not intersect an already-claimed region."""
         nlp = self._load()
         if nlp is None:
@@ -92,8 +92,9 @@ class NerBackend:
             entity_type = LABEL_MAP.get(ent.label_)
             if entity_type is None or entity_type not in wanted:
                 continue
-            span = Span(ent.start_char, ent.end_char, entity_type, ent.text, origin="ner")
-            if any(span.overlaps(other) for other in claimed):
+            start, end = ent.start_char, ent.end_char
+            if claimed.overlaps(start, end):
                 continue
-            found.append(span)
+            found.append(Span(start, end, entity_type, ent.text, origin="ner"))
+            claimed.add(start, end)
         return found

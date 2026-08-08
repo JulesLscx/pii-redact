@@ -223,7 +223,7 @@ class Redactor:
         wanted = self.settings.types
 
         # 1. Freeze existing tokens (idempotence).
-        claimed: List[Span] = token_spans(text)
+        claimed = token_spans(text)
         collected: List[Span] = []
 
         # 2. Deterministic rules — always run, never skipped by the budget.
@@ -232,9 +232,7 @@ class Redactor:
         # 3. Literal gazetteer (vault + terms file).
         if time.perf_counter() < deadline:
             self._ensure_matcher(wanted)
-            literal_hits = self.matcher.spans(text, claimed)
-            collected.extend(literal_hits)
-            claimed.extend(literal_hits)
+            collected.extend(self.matcher.spans(text, claimed))
 
         # 4. Optional NER, last and strictly budget-gated.
         if (
@@ -242,9 +240,7 @@ class Redactor:
             and len(text) <= self.settings.ner_max_chars
             and time.perf_counter() < deadline
         ):
-            ner_hits = self.ner.spans(text, wanted, claimed)
-            collected.extend(ner_hits)
-            claimed.extend(ner_hits)
+            collected.extend(self.ner.spans(text, wanted, claimed))
 
         return resolve_overlaps(collected)
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from functools import lru_cache
 
 from .types import EntityType
 
@@ -40,8 +41,14 @@ _SEPARATORS_RE = re.compile(r"[ .\-_/ ]")
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
+@lru_cache(maxsize=8192)
 def strip_accents(value: str) -> str:
-    """Fold accents so ``Amélie`` and ``Amelie`` hash to the same key."""
+    """Fold accents so ``Amélie`` and ``Amelie`` hash to the same key.
+
+    Memoised: a dense document calls this once per detected occurrence, and
+    NFD decomposition over the same handful of distinct values was the single
+    largest cost in the profile of a 200 KB scan.
+    """
     decomposed = unicodedata.normalize("NFD", value)
     return "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
 
@@ -64,6 +71,7 @@ def normalize_value(entity_type: str, value: str) -> str:
     return normalized
 
 
+@lru_cache(maxsize=16384)
 def hash_value(entity_type: str, value: str) -> str:
     """SHA-256 of ``type:normalized`` — the vault's dedup key.
 

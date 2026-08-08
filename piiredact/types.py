@@ -7,6 +7,7 @@ OpenCode/Codex adapter, or a plain ``python -m piiredact`` pipe.
 
 from __future__ import annotations
 
+from bisect import bisect_left, insort
 from dataclasses import dataclass, field
 from typing import Dict, List, Sequence, Tuple
 
@@ -117,6 +118,51 @@ class RedactionResult:
         for span in self.spans:
             out[span.entity_type] = out.get(span.entity_type, 0) + 1
         return out
+
+
+class ClaimSet:
+    """Sorted interval index answering "is this range already taken?".
+
+    Detectors run in priority order and each one must skip text an earlier
+    detector claimed. Scanning a growing list linearly makes that check O(n²)
+    in the number of hits — on a large document (tens of thousands of matches)
+    the pass goes from milliseconds to minutes. Bisecting a sorted interval
+    list makes it O(log n) per query, which keeps the cost linear overall and
+    the latency budget meaningful on inputs of any size.
+    """
+
+    __slots__ = ("_starts", "_ends")
+
+    def __init__(self) -> None:
+        self._starts: List[int] = []
+        self._ends: List[int] = []
+
+    def __len__(self) -> int:
+        return len(self._starts)
+
+    def overlaps(self, start: int, end: int) -> bool:
+        """True when ``[start, end)`` intersects any claimed interval."""
+        index = bisect_left(self._starts, start)
+        # The interval starting at or after `start` overlaps when it begins
+        # before `end`.
+        if index < len(self._starts) and self._starts[index] < end:
+            return True
+        # The interval starting before `start` overlaps when it ends after it.
+        if index > 0 and self._ends[index - 1] > start:
+            return True
+        return False
+
+    def add(self, start: int, end: int) -> None:
+        index = bisect_left(self._starts, start)
+        self._starts.insert(index, start)
+        self._ends.insert(index, end)
+
+    def add_span(self, span: "Span") -> None:
+        self.add(span.start, span.end)
+
+    def extend(self, spans: Sequence["Span"]) -> None:
+        for span in spans:
+            self.add(span.start, span.end)
 
 
 def resolve_overlaps(spans: Sequence[Span]) -> List[Span]:
