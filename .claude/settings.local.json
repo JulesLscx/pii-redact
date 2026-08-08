@@ -23,7 +23,17 @@
       "Bash(export PII_REDACT_DB=/tmp/t4/mapping.db)",
       "Bash(export PII_REDACT_DB=/tmp/t5/mapping.db)",
       "Bash(timeout 180 python3 -m piiredact bench --runs 20 --repeat 1000)",
-      "Bash(rm -rf /tmp/t2 /tmp/t3 /tmp/t4 /tmp/t5 *)"
+      "Bash(rm -rf /tmp/t2 /tmp/t3 /tmp/t4 /tmp/t5 *)",
+      "Bash(python3 -m pytest --version)",
+      "Bash(python3 -c \"import pytest, sys; print\\('sys pytest', pytest.__version__\\)\")",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_leak.py -q)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_leak.py -q -x --tb=long)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_leak.py)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest \"tests/test_leak.py::test_no_rule_pattern_ends_with_word_boundary\" --tb=short)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_leak.py --tb=short)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_core.py --tb=short)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/ --tb=short)",
+      "Bash(/root/graph-rag/.venv/bin/python -m pytest tests/test_adapters.py --tb=short)"
     ]
   }
 }

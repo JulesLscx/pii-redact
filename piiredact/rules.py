@@ -43,7 +43,12 @@ _MONTHS = (
 _TITLES = r"(?:M\.|MM\.|Mme|Mmes|Mlle|Dr|Pr|Me|Monsieur|Madame|Mademoiselle|Maître|Maitre)"
 
 # A capitalised French name particle chain: "Jean-Pierre", "de La Fontaine".
-_NAME_WORD = r"[A-ZÀ-Ý][\w'’\-]{1,30}"
+# The leading capital is asserted with a scoped ``(?-i:...)`` because the rules
+# that embed this chain are compiled with ``re.IGNORECASE`` for their anchor
+# ("banque", "titulaire"). Without the scoped flag the capital stops being a
+# constraint and the chain runs on through ordinary lowercase words —
+# "SARL Dupont Toitures avant le" instead of "Dupont Toitures".
+_NAME_WORD = r"(?-i:[A-ZÀ-Ý])[\w'’\-]{1,30}"
 _NAME_CHAIN = rf"{_NAME_WORD}(?:\s+(?:de|du|des|le|la|van|von|d'|l')?\s*{_NAME_WORD}){{0,3}}"
 
 

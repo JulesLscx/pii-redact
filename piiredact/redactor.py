@@ -32,7 +32,7 @@ from .matcher import LiteralMatcher, parse_terms_file
 from .ner import NerBackend
 from .normalize import content_hash
 from .rules import BARE_TOKEN_RE, TOKEN_RE, rule_spans, token_spans
-from .types import RedactionResult, Span, resolve_overlaps
+from .types import ClaimSet, RedactionResult, Span, resolve_overlaps
 from .vault import Vault
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,13 @@ class Redactor:
         if truncated:
             redacted += TRUNCATION_NOTICE
 
-        self._redact_cache.put(generation, digest, (redacted, tuple(spans), truncated))
+        # Store under the generation as it stands *after* this pass: detecting
+        # a new value bumps the counter, so keying on the pre-pass generation
+        # would file every entry under a version that is already stale and the
+        # cache would never hit for the documents that matter most.
+        self._redact_cache.put(
+            self.vault.generation, digest, (redacted, tuple(spans), truncated)
+        )
         elapsed = (time.perf_counter() - started) * 1000
         if self.settings.log_counts and spans:
             logger.info(
@@ -242,7 +248,35 @@ class Redactor:
         ):
             collected.extend(self.ner.spans(text, wanted, claimed))
 
+        # 5. Sweep for repeats of what this very pass just learned.
+        collected.extend(self._intra_document_pass(text, collected, claimed))
+
         return resolve_overlaps(collected)
+
+    def _intra_document_pass(
+        self,
+        text: str,
+        found: Sequence[Span],
+        claimed: ClaimSet,
+    ) -> List[Span]:
+        """Catch later, unanchored repeats of a value found earlier in *text*.
+
+        The persistent gazetteer is built from the vault, and the vault only
+        learns a value once the pass that found it completes — so within a
+        single document the anchored first mention ("Mme Amélie Roux") was
+        caught while a bare second mention three lines down was not. Sweeping
+        the text again with just the literals discovered in this pass closes
+        that window for the same cost as one extra alternation scan, and keeps
+        the property fully deterministic.
+        """
+        if not found:
+            return []
+        literals = {(span.entity_type, span.text) for span in found if len(span.text) >= 3}
+        if not literals:
+            return []
+        sweeper = LiteralMatcher()
+        sweeper.build(sorted(literals), self.settings.types)
+        return sweeper.spans(text, claimed)
 
     def _ensure_matcher(self, wanted: "frozenset") -> None:
         self._load_terms_once()

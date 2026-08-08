@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piiredact"
+version = "0.1.0"
+description = "Local, deterministic PII pseudonymisation for LLM agents (FR rules, SQLite vault, host-agnostic core)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Jules Lascoux" }]
+keywords = ["pii", "privacy", "pseudonymisation", "llm", "agent", "rgpd"]
+
+# No runtime dependencies on purpose: the core is stdlib-only so it can be
+# vendored into any host without dragging a dependency tree behind it.
+dependencies = []
+
+[project.optional-dependencies]
+# The statistical layer. Everything works without it — see README.
+ner = ["spacy>=3.7"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+piiredact = "piiredact.cli:main"
+
+[tool.setuptools]
+# Only the core package ships. The plugin entry point (``__init__.py`` at the
+# repo root) is Hermes-specific and is loaded from the plugin directory, not
+# from the installed distribution.
+packages = ["piiredact", "piiredact.adapters"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+# importlib mode: the repository root holds a Hermes plugin ``__init__.py``,
+# and prepend-mode collection would try to import it as a top-level module
+# (its relative imports only resolve inside the host).
+addopts = "--import-mode=importlib -q"
+filterwarnings = ["error::DeprecationWarning"]

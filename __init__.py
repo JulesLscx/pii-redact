@@ -22,6 +22,19 @@ you are most likely to want:
 
 from __future__ import annotations
 
-from .piiredact.adapters.hermes import register
+try:
+    # Normal path: Hermes loads this directory as a package, so the core is a
+    # subpackage of it.
+    from .piiredact.adapters.hermes import register
+except ImportError:  # pragma: no cover - exercised by tooling, not by Hermes
+    # Fallback for anything that loads this file as a loose module rather than
+    # as a package member (test collectors, `python __init__.py`, editors).
+    # Without it the relative import above raises and the tool reports a
+    # spurious failure against a plugin that is in fact fine.
+    import os
+    import sys
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from piiredact.adapters.hermes import register  # type: ignore[no-redef]
 
 __all__ = ["register"]
